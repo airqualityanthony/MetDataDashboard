@@ -5,7 +5,7 @@ output:
   flexdashboard::flex_dashboard:
     orientation: rows
     social: menu
-    source_code: https://github.com/airqualityanthony/metdatadashboard
+    source_code: https://github.com/airqualityanthony/MetDataDashboard
     theme: simplex
 ---
 
@@ -219,7 +219,7 @@ The application is built with the [Shiny](http://shiny.rstudio.com) framework fo
 
 Meteorological data is retrieved from NOAA Integrated Surface Database using the [worldmet](http://davidcarslaw.github.io/worldmet/) R package. 
 
-Code for the dashboard is linked in the top right and available at <https://github.com/airqualityanthony/metdatadashboard>.  
+Code for the dashboard is linked in the top right and available at <https://github.com/airqualityanthony/MetDataDashboard>.  
 
 I welcome feedback and suggestions on the github page.
 
