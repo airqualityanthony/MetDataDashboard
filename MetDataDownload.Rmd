@@ -1,0 +1,230 @@
+---
+title: "Meteorological Data Download"
+runtime: shiny
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    social: menu
+    source_code: https://github.com/airqualityanthony/metdatadashboard
+    theme: simplex
+---
+
+```{r setup, include=FALSE}
+
+library(flexdashboard)
+library(openair)
+library(leaflet)
+library(viridis)
+library(leaflet.extras)
+library(httr)
+library(jsonlite)
+library(htmltools)
+library(htmlwidgets)
+library(dplyr)
+library(visdat)
+library(worldmet)
+library(lubridate)
+
+
+met_data_final <- readRDS("met_data_final.rds")
+met_data_final$group[met_data_final$wd == 0] <- "grey"
+met_data_final$group[between(met_data_final$wd,0.000000001,10)] <- "green"
+met_data_final$date <- as.Date(met_data_final$date)
+
+# store north arrow png
+green_arrow <- "green_arrow.png"
+
+orange_arrow <- "orange_arrow.png"
+
+red_arrow <- "red_arrow.png"
+
+grey_arrow <- "grey_arrow.png"
+
+# make north arrow icon
+grey_arrow.icon <- 
+  makeIcon( iconUrl = grey_arrow
+            , iconWidth = 20
+            , iconHeight = 20 )
+green_arrow.icon <-
+  makeIcon( iconUrl = green_arrow
+            , iconWidth = 20
+            , iconHeight = 20 )
+
+orange_arrow.icon <-
+  makeIcon( iconUrl = orange_arrow
+            , iconWidth = 20
+            , iconHeight = 20 )
+red_arrow.icon <-
+  makeIcon( iconUrl = red_arrow
+            , iconWidth = 20
+            , iconHeight = 20 )
+
+arrowIcons <- iconList(grey = grey_arrow.icon, green = green_arrow.icon,orange = orange_arrow.icon, red = red_arrow.icon)
+
+
+rotatedMarker <- 
+  htmlDependency( name = "Leaflet.rotatedMarker" # note: this .js file has to be copied and stored in your current working directory 
+                  , version = "0.1.2"
+                  , src = normalizePath( path = getwd() )
+                  , script = "Leaflet.rotateMarker.js" )
+
+registerPlugin <- function(map, plugin) {
+  map$dependencies <- c(map$dependencies, list(plugin))
+  map
+}
+
+
+date<-seq(as.Date("2019-01-01"), as.Date("2019-12-01"), by="day")
+df = met_data_final
+
+tilesURL <- "http://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+points <- reactive({
+    df %>% 
+      filter(date==input$date)})
+data <- reactiveValues(clickedMarker=NULL)
+
+
+```
+Meteorological Data
+=====================================
+
+Sidebar {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+# Define inputs
+sliderInput("date","Animation Date",min(date),max(date),value = min(date),animate=T)
+
+# Set up data download
+data_for_dl <- reactive({
+  
+  download_data <- importNOAA(code = click_marker(), year = 2019)
+  return(download_data)
+})
+
+output$downloadCSV <- downloadHandler(
+  filename = 'data.csv',
+  content = function(file) {
+    write.csv(data_for_dl(), file)
+  }
+)
+
+
+
+```
+Click play to see the Met data animate over time. 
+
+Click on a specific site in the map to see the data availability, THEN click on the download link below to return it's data for 2019. 
+
+```{r}
+downloadLink('downloadCSV', label = 'Download CSV for active site (2019)')
+```
+
+```{r}
+output$downloadMET <- downloadHandler(
+  filename = 'data.met', 
+  content = function(file){
+  cat("**************************************
+  
+  Data source: NOAA Integrated Surface Database (ISD) - https://www.ncdc.noaa.gov/isd
+  Data extracted using the 'worldmet' package by David Carslaw - https://github.com/davidcarslaw/worldmet
+  
+  **************************************
+  
+  VARIABLES:
+  8
+  YEAR
+  DAY
+  HOUR
+  U
+  PHI
+  CL
+  T0C
+  RHUM
+  
+            
+  DATA:",
+      paste(year(data_for_dl()$date),yday(data_for_dl()$date),hour(data_for_dl()$date),round(data_for_dl()$ws,digits = 2),round(data_for_dl()$wd,digits=4),data_for_dl()$cl,data_for_dl()$air_temp,data_for_dl()$RH, sep = ","),
+      file = file,sep = "\n")
+  
+  })
+
+
+```
+You can also download the data formatted for ADMS by clicking the link below (do not change file extension name, just save as you would like it to be named, it will automaticall .MET file append)
+
+```{r}
+downloadLink('downloadMET', label = 'Download MET for active site (2019)')
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Map
+
+```{r}
+# Draw the map without selected tracts
+output$map <- renderLeaflet({
+  map <- leaflet() %>%
+      addTiles() %>%
+      setView(-2.37,55.111,zoom = 5) %>%
+      registerPlugin( plugin = rotatedMarker ) %>%
+      addMarkers(data = points(),lng = ~longitude
+                  , lat = ~latitude
+                  , label = ~station
+                  , layerId = ~code
+                  , icon = ~arrowIcons[group]
+                  , options = markerOptions( rotationAngle = ~wd - 180 ))
+      
+    map
+    
+  })
+leafletOutput('map')
+```
+
+### Data Availability
+
+```{r}
+click_marker <- eventReactive(input$map_marker_click, {
+
+  x <- input$map_marker_click
+
+  return(x$id)
+
+})
+
+data_for_chart <- reactive({
+
+  return(df[df$code == click_marker(), ])
+
+})
+
+output$visdata <- renderPlot({
+
+  vis <- vis_miss(data_for_chart(),
+           sort_miss = TRUE)
+
+  vis
+
+})
+plotOutput('visdata')
+```
+
+
+
+About
+============================================================================
+
+The application is built with the [Shiny](http://shiny.rstudio.com) framework for the [R programming language](https://www.r-project.org/). The application layout is produced with the [flexdashboard](http://rstudio.github.io/flexdashboard/index.html) package, and the charts and maps use [visdat](https://github.com/ropensci/visdat) and [Leaflet.js](http://leafletjs.com/), all accessed through their corresponding R packages.  
+
+Meteorological data is retrieved from NOAA Integrated Surface Database using the [worldmet](http://davidcarslaw.github.io/worldmet/) R package. 
+
+Code for the dashboard is linked in the top right and available at <https://github.com/airqualityanthony/metdatadashboard>.  
+
+I welcome feedback and suggestions on the github page.
+
+To Do: 
+
+- merge more met data into sites from other sources
+- Selectable years
+

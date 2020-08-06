@@ -1,0 +1,12 @@
+name: MetDownloadDashboard
+title: MetDownloadDashboard
+username:
+account: user-test
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2646946
+bundleId: 3483178
+url: https://user-test.shinyapps.io/MetDownloadDashboard/
+when: 1596732140.24136
+asMultiple: FALSE
+asStatic: FALSE
