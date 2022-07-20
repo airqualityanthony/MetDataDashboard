@@ -34,6 +34,7 @@ library(visdat)
 library(worldmet)
 library(lubridate)
 library(ggplot2)
+library(reshape2)
 
 
 # store north arrow png
@@ -107,6 +108,8 @@ points <- reactive({
 })
 data <- reactiveValues(clickedMarker=NULL)
 
+# aq_meta <- importMeta(all = T) %>% filter(variable=="NO2")
+aq_meta <- importMeta()
 
 ```
 Meteorological Data
@@ -196,13 +199,23 @@ output$map <- renderLeaflet({
                   , label = ~station
                   , layerId = ~code
                   , icon = ~arrowIcons[group]
-                  , options = markerOptions( rotationAngle = ~wd - 180 ))
+                  , group = "Met Sites"
+                  , options = markerOptions( rotationAngle = ~wd - 180 )) %>% 
+      leaflet::addCircleMarkers(data=aq_meta,lat=~latitude,lng=~longitude,label= ~site,radius = 1,opacity = 1,color = "purple", group = "AURN") %>%
+      addLayersControl(
+      overlayGroups = c("Met Sites","AURN"),
+      options = layersControlOptions(collapsed = FALSE)
+  
+    )
       
     map
     
   })
 leafletOutput('map')
 ```
+
+Row
+-----------------------------------------------------------------------
 
 ### Data Availability
 
@@ -234,6 +247,27 @@ plotOutput('visdata')
 # downloadLink('downloadCSV', label = 'Download CSV for active site')
 ```
 
+### Data
+
+```{r}
+
+
+output$dataplot <- renderPlot({
+  
+
+    mdata <- data_for_chart() %>% select(code,station,date,latitude,longitude,ws,air_temp)
+    mdata <- melt(mdata, id=c("code","station","date","latitude","longitude"))
+    
+    pl <- ggplot(mdata) + geom_line(aes(date,value,colour=variable)) + ggtitle(as.character(mdata$station))
+    pl
+})
+plotOutput('dataplot')
+
+
+```
+
+
+```
 
 
 About
