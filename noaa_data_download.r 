@@ -1,0 +1,42 @@
+library(worldmet)
+library(dplyr)
+
+metmetauk <- getMeta(country = 'UK')
+
+met_daily_2023 <- list()
+
+for (x in metmetauk$code) {
+  site_data <- importNOAA(
+    code = x,
+    year = 2023,
+    hourly = TRUE,
+    n.cores = 1,
+    quiet = FALSE,
+    path = NA
+  )
+  
+  met_daily_2023[[x]] <- site_data
+  
+  # Save intermediate results to disk if memory usage becomes high
+  if (sum(sapply(met_daily_2023, object.size)) > 800 * 1024 * 1024) { # 800 MB threshold
+    save(met_daily_2023, file = paste0("met_daily_2023_part_", x, ".RData"))
+    met_daily_2023 <- list() # Clear the list to free up memory
+  }
+}
+
+# Combine all data into a single data frame
+met_daily_2023 <- bind_rows(met_daily_2023)
+
+# Load and combine intermediate results if any
+if (file.exists("met_daily_2023_part_1.RData")) {
+  files <- list.files(pattern = "met_daily_2023_part_.*\\.RData")
+  for (file in files) {
+    load(file)
+    met_daily_2023 <- bind_rows(met_daily_2023, do.call(rbind, met_daily_2023))
+  }
+}
+
+# Check the result
+head(met_daily_2023)
+
+saveRDS(met_daily_2023,"met_daily_2023.rds")
